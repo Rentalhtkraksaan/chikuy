@@ -9,9 +9,11 @@
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <style>
     :root { 
-      --wa-teal: #075e54; --wa-green: #25d366;
-      --wa-light-green: #dcf8c6; --bg-chat: #e5ddd5;
-      --primary: #2563eb; --border: #e2e8f0;
+      --wa-teal: #075e54; 
+      --wa-green: #25d366;
+      --wa-light-green: #dcf8c6; 
+      --bg-chat: #e5ddd5;
+      --footer-bg: #f0f0f0;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -25,11 +27,14 @@
       overflow: hidden; 
     }
 
+    /* Modal */
+    .modal-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); display:flex; align-items:center; justify-content:center; z-index:1000; }
+    .btn-main { background: var(--wa-teal); color: white; padding: 16px; border-radius: 12px; border: none; font-weight: 700; width: 100%; }
+
     /* Setup Screen */
     .setup-screen { padding: 40px 24px; display: flex; flex-direction: column; gap: 20px; justify-content: center; height: 100vh; max-width: 400px; margin: 0 auto; text-align: center; }
-    .btn-main { background: var(--wa-teal); color: white; padding: 16px; border-radius: 12px; border: none; font-weight: 700; cursor: pointer; }
 
-    /* Header ala WA */
+    /* Header */
     .header { 
       background: var(--wa-teal); 
       color: white; 
@@ -39,21 +44,21 @@
       gap: 12px;
       box-shadow: 0 2px 4px rgba(0,0,0,0.1);
       z-index: 100;
+      padding-top: env(safe-area-inset-top); /* Jarak untuk poni iPhone */
     }
     .header-info { flex: 1; }
-    .header-info b { font-size: 18px; display: block; }
+    .header-info b { font-size: 17px; display: block; }
     .header-info span { font-size: 12px; opacity: 0.8; }
 
-    /* Container Utama */
+    /* Chat Container */
     .chat-container { 
       display: none; 
       flex-direction: column; 
       height: 100vh; 
       background: var(--bg-chat); 
-      position: relative;
     }
 
-    /* Chat Box Area */
+    /* Chat Box */
     .chat-box { 
       flex: 1; 
       overflow-y: auto; 
@@ -61,33 +66,25 @@
       display: flex; 
       flex-direction: column; 
       gap: 8px;
-      /* Background pola ala WA (opsional) */
       background-image: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png');
+      background-attachment: fixed;
     }
 
-    /* Bubble Chat Modern */
-    .msg { 
-      max-width: 85%; 
-      padding: 8px 12px; 
-      border-radius: 10px; 
-      font-size: 15px; 
-      position: relative; 
-      box-shadow: 0 1px 1px rgba(0,0,0,0.1);
-      line-height: 1.4;
-    }
+    /* Bubbles */
+    .msg { max-width: 85%; padding: 8px 12px; border-radius: 10px; font-size: 15px; position: relative; box-shadow: 0 1px 1px rgba(0,0,0,0.1); }
     .msg.you { background: var(--wa-light-green); align-self: flex-end; border-top-right-radius: 2px; }
     .msg.other { background: white; align-self: flex-start; border-top-left-radius: 2px; }
-    
     .msg .name { font-size: 12px; font-weight: bold; color: #d32f2f; margin-bottom: 2px; }
     .msg .time { font-size: 10px; text-align: right; margin-top: 4px; color: #667781; }
 
-    /* Input Area Fixed di Bawah */
+    /* FOOTER AREA (Tempat Keyboard) */
     .footer-input {
-      background: transparent;
-      padding: 8px;
+      background: var(--footer-bg);
+      padding: 10px 10px calc(15px + env(safe-area-inset-bottom)) 10px; /* Space ekstra di bawah */
       display: flex;
       align-items: flex-end;
       gap: 8px;
+      border-top: 1px solid rgba(0,0,0,0.05);
     }
 
     .input-wrapper {
@@ -96,7 +93,7 @@
       flex: 1;
       display: flex;
       align-items: center;
-      padding: 5px 12px;
+      padding: 2px 15px;
       min-height: 48px;
       box-shadow: 0 1px 2px rgba(0,0,0,0.1);
     }
@@ -105,8 +102,9 @@
       flex: 1;
       border: none;
       outline: none;
-      padding: 8px 5px;
+      padding: 10px 5px;
       font-size: 16px;
+      background: transparent;
     }
 
     .btn-circle {
@@ -120,47 +118,41 @@
       color: white;
       border: none;
       flex-shrink: 0;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
     }
 
-    .reply-preview {
-      background: #f0f0f0;
-      border-left: 4px solid var(--wa-teal);
-      margin: 5px;
-      padding: 8px;
-      border-radius: 8px;
-      display: none;
-    }
+    /* Animation */
+    @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .msg { animation: slideIn 0.2s ease-out; }
 
-    /* Modal */
-    .modal-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); display:flex; align-items:center; justify-content:center; z-index:200; }
   </style>
 </head>
 <body>
 
 <div id="welcomeModal" class="modal-overlay">
-  <div style="background:white; padding:24px; border-radius:16px; width:85%; text-align:center;">
-    <h2>Selamat Datang</h2>
-    <p style="margin:15px 0; color:#666">Privasi kamu adalah prioritas kami.</p>
-    <button class="btn-main" style="width:100%" onclick="closeModal()">Mulai Pesan</button>
+  <div style="background:white; padding:24px; border-radius:20px; width:85%; text-align:center; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+    <h2 style="color:var(--wa-teal)">ProConnect</h2>
+    <p style="margin:15px 0; color:#666">Privasi terjamin. Chat akan aman di dalam forum ini.</p>
+    <button class="btn-main" onclick="closeModal()">Mulai</button>
   </div>
 </div>
 
 <div class="setup-screen" id="setupScreen">
-  <h1 style="color:var(--wa-teal)">ProConnect</h1>
-  <input type="text" id="kodeInput" style="padding:15px; border-radius:10px; border:1px solid #ccc" placeholder="Kode Forum (Contoh: MABAR)">
-  <button class="btn-main" onclick="joinForum()">Masuk ke Forum</button>
-  <button onclick="createForum()" style="background:none; border:none; color:var(--wa-teal); font-weight:bold">Atau Buat Forum Baru</button>
+  <h1 style="color:var(--wa-teal); font-size: 32px;">ProConnect</h1>
+  <p style="color:#666">Masukkan kode rahasia untuk bergabung</p>
+  <input type="text" id="kodeInput" style="padding:18px; border-radius:15px; border:2px solid #ddd; font-size:16px; outline:none;" placeholder="Contoh: KODE123">
+  <button class="btn-main" onclick="joinForum()">GABUNG SEKARANG</button>
+  <button onclick="createForum()" style="background:none; border:none; color:var(--wa-teal); font-weight:bold; cursor:pointer">Atau Buat Forum Baru</button>
 </div>
 
 <div class="chat-container" id="chatContainer">
   <div class="header">
     <i class="material-icons">arrow_back</i>
     <div class="header-info">
-      <b id="roomTitle">Grup Chat</b>
-      <span id="activeUsers">0</span> Anggota Online
+      <b id="roomTitle">-</b>
+      <span id="activeUsers">0</span> Aktif
     </div>
-    <i class="material-icons" onclick="location.reload()">more_vert</i>
+    <i class="material-icons" onclick="location.reload()">logout</i>
   </div>
 
   <div class="chat-box" id="chat-box"></div>
@@ -168,19 +160,21 @@
   <div class="footer-input">
     <div class="input-wrapper">
       <i class="material-icons" style="color:#8696a0">sentiment_satisfied</i>
-      <input type="text" id="message" placeholder="Ketik pesan..." onfocus="scrollToBottom()">
-      <label for="fileInp"><i class="material-icons" style="color:#8696a0; transform: rotate(45deg);">attach_file</i></label>
+      <input type="text" id="message" placeholder="Ketik pesan..." autocomplete="off">
+      <label for="fileInp">
+        <i class="material-icons" style="color:#8696a0; transform: rotate(45deg); cursor:pointer">attach_file</i>
+      </label>
       <input type="file" id="fileInp" accept="image/*" style="display:none" onchange="uploadPhoto(this)">
     </div>
     
-    <button class="btn-circle" id="sendBtn" onclick="handleSendClick()">
+    <button class="btn-circle" onclick="handleSendClick()">
       <i class="material-icons" id="micBtn">mic</i>
     </button>
   </div>
 </div>
 
 <script>
-  // Script Firebase Tetap Sama (Gunakan config kamu)
+  // CONFIGURASI FIREBASE
   const firebaseConfig = {
     apiKey: "AIzaSyDCljKE_rVvI5U_lhUvFeu4ZENHk4jTgmI",
     authDomain: "k3-cw-5107e.firebaseapp.com",
@@ -193,6 +187,7 @@
 
   firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
+
   let user = localStorage.getItem("chatUser") || "User-" + Math.floor(Math.random() * 999);
   localStorage.setItem("chatUser", user);
 
@@ -200,12 +195,23 @@
   const msgInput = document.getElementById("message");
   const micBtn = document.getElementById("micBtn");
 
-  // Deteksi perubahan input untuk ganti icon Mic ke Send
+  // Toggle Icon Mic ke Send
   msgInput.addEventListener("input", (e) => {
     micBtn.innerText = e.target.value.trim() ? "send" : "mic";
   });
 
+  // Auto Scroll saat keyboard muncul
+  msgInput.addEventListener("focus", () => {
+    setTimeout(scrollToBottom, 300);
+  });
+
   function closeModal() { document.getElementById("welcomeModal").style.display = "none"; }
+
+  function createForum() {
+    const code = "ROOM-" + Math.random().toString(36).substring(2, 7).toUpperCase();
+    document.getElementById("kodeInput").value = code;
+    joinForum();
+  }
 
   function joinForum() {
     const code = document.getElementById("kodeInput").value.trim().toUpperCase();
@@ -221,12 +227,6 @@
       document.getElementById("activeUsers").innerText = snap.numChildren();
     });
     loadMessages();
-  }
-
-  function createForum() {
-    const code = "PRO-" + Math.random().toString(36).substring(2, 6).toUpperCase();
-    document.getElementById("kodeInput").value = code;
-    joinForum();
   }
 
   function loadMessages() {
@@ -245,8 +245,8 @@
     div.className = "msg " + (data.user === user ? "you" : "other");
     div.innerHTML = `
       ${data.user !== user ? `<div class="name">${data.user}</div>` : ''}
-      ${data.image ? `<img src="${data.image}" style="width:100%; border-radius:8px; margin-bottom:5px;">` : ''}
-      <div>${data.text || ''}</div>
+      ${data.image ? `<img src="${data.image}" style="width:100%; border-radius:8px; margin-bottom:5px; display:block">` : ''}
+      <div style="word-break: break-word;">${data.text || ''}</div>
       <div class="time">${new Date(data.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div>
     `;
     return div;
@@ -260,12 +260,12 @@
       });
       msgInput.value = "";
       micBtn.innerText = "mic";
-    } else {
-      alert("Fitur Voice Note sedang diproses!");
+      scrollToBottom();
     }
   }
 
   function uploadPhoto(input) {
+    if(!input.files[0]) return;
     const reader = new FileReader();
     reader.onload = e => {
       db.ref("chat/" + currentRoom).push({
@@ -277,7 +277,7 @@
 
   function scrollToBottom() {
     const cb = document.getElementById("chat-box");
-    setTimeout(() => { cb.scrollTop = cb.scrollHeight; }, 100);
+    cb.scrollTop = cb.scrollHeight;
   }
 </script>
 
