@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <title>ProConnect - Pinky Fix</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <style>
+    :root { --primary: #f472b6; --bg: #fdf2f8; --border: #fbcfe8; --text: #4a044e; }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body { font-family: -apple-system, sans-serif; background: var(--bg); height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+
+    /* Layout */
+    .chat-container { display: none; flex-direction: column; height: 100%; background: #fff; }
+    .header { padding: 10px 16px; border-bottom: 1px solid var(--border); background: #fff; }
+    .search-row { display: flex; align-items: center; background: #fdf2f8; border-radius: 10px; padding: 5px 10px; margin-top: 8px; }
+    .search-row input { border: none; background: transparent; outline: none; width: 100%; font-size: 13px; margin-left: 5px; }
+
+    #pin-bar { background: #fdf2f8; padding: 10px 16px; border-bottom: 1px solid var(--border); display: none; align-items: center; gap: 8px; font-size: 12px; color: var(--primary); cursor: pointer; }
+
+    .chat-box { flex: 1; overflow-y: auto; padding: 15px; background: linear-gradient(to bottom, #fdf2f8, #fce7f3); display: flex; flex-direction: column; gap: 10px; scroll-behavior: smooth; }
+
+    /* Bubble */
+    .msg { max-width: 80%; padding: 10px 14px; border-radius: 18px; position: relative; font-size: 14px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .msg.you { background: var(--primary); color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
+    .msg.other { background: white; color: #333; align-self: flex-start; border-bottom-left-radius: 2px; border: 1px solid var(--border); }
+    
+    .msg .name { font-size: 10px; font-weight: bold; margin-bottom: 3px; opacity: 0.8; }
+    .msg .time { font-size: 9px; text-align: right; margin-top: 5px; opacity: 0.6; }
+    
+    /* Jump Highlight */
+    .msg.highlight { animation: flash 1.5s ease; }
+    @keyframes flash { 0% { background: #fbcfe8; } 100% { } }
+
+    /* Reply Style */
+    .reply-box { background: rgba(0,0,0,0.07); padding: 5px 8px; border-left: 3px solid var(--primary); border-radius: 4px; font-size: 11px; margin-bottom: 5px; cursor: pointer; }
+    .you .reply-box { background: rgba(255,255,255,0.2); border-left-color: white; color: white; }
+
+    /* Menu di dalam bubble - Klik Nama untuk Munculin */
+    .msg-menu { display: none; font-size: 10px; margin-top: 8px; gap: 12px; border-top: 1px solid rgba(0,0,0,0.1); padding-top: 6px; font-weight: bold; cursor: pointer; }
+    .msg.active .msg-menu { display: flex; }
+
+    /* Input */
+    .input-area { padding: 12px; border-top: 1px solid var(--border); background: #fff; padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+    #reply-preview { background: #fdf2f8; border-left: 4px solid var(--primary); padding: 8px; margin-bottom: 8px; border-radius: 8px; display: none; justify-content: space-between; font-size: 12px; align-items: center; }
+
+    .input-row { display: flex; gap: 8px; align-items: center; }
+    .input-field { flex: 1; background: #fdf2f8; border-radius: 25px; padding: 2px 15px; border: 1px solid var(--border); display: flex; align-items: center; }
+    .input-field input { flex: 1; padding: 10px 5px; border: none; outline: none; background: transparent; font-size: 15px; }
+
+    .btn-round { width: 42px; height: 42px; border-radius: 50%; background: var(--primary); color: white; display: flex; align-items: center; justify-content: center; border: none; cursor: pointer; }
+    
+    /* Setup */
+    .setup-screen { padding: 40px; display: flex; flex-direction: column; gap: 15px; justify-content: center; height: 100%; text-align: center; }
+    .btn-pink { background: var(--primary); color: white; padding: 16px; border-radius: 15px; border: none; font-weight: bold; }
+  </style>
+</head>
+<body>
+
+<div class="setup-screen" id="setup">
+  <h1 style="color:var(--primary)">ProConnect</h1>
+  <div id="m-menu">
+    <button class="btn-pink" style="width:100%; margin-bottom:10px;" onclick="showJ()">Gabung Forum</button>
+    <button class="btn-pink" style="width:100%; background:#fff; color:var(--primary); border:2px solid var(--primary)" onclick="genR()">Buat Forum Baru</button>
+  </div>
+  <div id="j-menu" style="display:none">
+    <input type="text" id="k-inp" placeholder="Kode Forum..." style="padding:15px; border-radius:12px; border:1px solid var(--border); width:100%; margin-bottom:10px; text-align:center;">
+    <button class="btn-pink" style="width:100%" onclick="join()">Masuk</button>
+  </div>
+</div>
+
+<div class="chat-container" id="chat-ui">
+  <div class="header">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div><b id="r-title" style="color:var(--primary)">-</b> <span style="font-size:10px; color:#db2777; margin-left:5px;">● <span id="u-count">0</span> Aktif</span></div>
+      <i class="material-icons" style="color:var(--primary); cursor:pointer" onclick="location.reload()">logout</i>
+    </div>
+    <div class="search-row">
+      <i class="material-icons" style="font-size:16px; color:var(--primary)">search</i>
+      <input type="text" id="s-inp" placeholder="Cari pesan..." oninput="filter()">
+    </div>
+  </div>
+
+  <div id="pin-bar" onclick="jump(this.dataset.key)">
+    <i class="material-icons" style="font-size:16px">push_pin</i>
+    <span id="pin-txt">Memuat pin...</span>
+  </div>
+
+  <div class="chat-box" id="chat-box"></div>
+
+  <div class="input-area">
+    <div id="reply-preview"></div>
+    <div id="rec-ui" style="display:none; color:red; font-size:12px; font-weight:bold; margin-bottom:5px;">● Merekam... <span onclick="cancelVN()" style="color:#666; margin-left:10px;">[BATAL]</span></div>
+    <div class="input-row">
+      <div class="input-field">
+        <label for="f-inp"><i class="material-icons" style="color:var(--primary); cursor:pointer">add_circle</i></label>
+        <input type="file" id="f-inp" accept="image/*" style="display:none" onchange="upImg(this)">
+        <input type="text" id="m-inp" placeholder="Tulis pesan..." oninput="checkInp()">
+      </div>
+      <button id="btn-mic" class="btn-round" onclick="hVN()"><i class="material-icons" id="mic-icon">mic</i></button>
+      <button id="btn-send" class="btn-round" style="display:none" onclick="send()"><i class="material-icons">send</i></button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyDCljKE_rVvI5U_lhUvFeu4ZENHk4jTgmI",
+    authDomain: "k3-cw-5107e.firebaseapp.com",
+    databaseURL: "https://k3-cw-5107e-default-rtdb.firebaseio.com",
+    projectId: "k3-cw-5107e",
+    storageBucket: "k3-cw-5107e.firebasestorage.app",
+    messagingSenderId: "118711004508",
+    appId: "1:118711004508:web:5fc2f0f2bfbed4a56d2599"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+  const user = localStorage.getItem("chatUser") || "User-" + Math.floor(Math.random() * 999);
+  localStorage.setItem("chatUser", user);
+
+  let currentRoom = null, mediaRec, audioCh = [], isB = false, replyData = null, pinnedID = null;
+
+  function showJ() { document.getElementById('m-menu').style.display='none'; document.getElementById('j-menu').style.display='block'; }
+  function genR() { const c = "PINK-"+Math.random().toString(36).substring(2,7).toUpperCase(); document.getElementById('k-inp').value = c; showJ(); }
+
+  function join() {
+    const c = document.getElementById('k-inp').value.trim().toUpperCase();
+    if(!c) return;
+    currentRoom = c;
+    document.getElementById('setup').style.display='none';
+    document.getElementById('chat-ui').style.display='flex';
+    document.getElementById('r-title').innerText = c;
+    db.ref(`rooms/${c}/users/${user}`).set(true);
+    db.ref(`rooms/${c}/users/${user}`).onDisconnect().remove();
+    db.ref(`rooms/${c}/users`).on("value", s => document.getElementById('u-count').innerText = s.numChildren());
+    loadChat(); loadPin();
+  }
+
+  function loadChat() {
+    db.ref("chat/"+currentRoom).on("value", snap => {
+      const box = document.getElementById('chat-box');
+      box.innerHTML = "";
+      snap.forEach(child => {
+        box.appendChild(render(child.val(), child.key));
+      });
+      box.scrollTop = box.scrollHeight;
+    });
+  }
+
+  function render(d, key) {
+    const div = document.createElement("div");
+    div.className = "msg " + (d.user === user ? "you" : "other");
+    div.id = "msg-" + key;
+    
+    // Klik Bubble untuk menu, tapi klik box reply untuk jump
+    div.onclick = (e) => {
+        if(!e.target.closest('.reply-box')) div.classList.toggle('active');
+    };
+
+    const age = Date.now() - d.timestamp;
+    const isP = pinnedID === key;
+
+    div.innerHTML = `
+      <div class="name">${d.user}</div>
+      ${d.replyTo ? `<div class="reply-box" onclick="jump('${d.replyTo.id}')"><b>${d.replyTo.user}</b>: ${d.replyTo.text}</div>` : ''}
+      ${d.image ? `<img src="${d.image}" style="width:100%; border-radius:10px; margin-bottom:5px;">` : ''}
+      ${d.audio ? `<div style="width:100%; margin-top:5px;"><audio controls src="${d.audio}" style="width:100%; height:30px;"></audio></div>` : ''}
+      <div style="word-break:break-word">${d.text || ''}</div>
+      <div class="time">${new Date(d.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})} ${isP ? '📌' : ''}</div>
+      <div class="msg-menu">
+        <span onclick="setRep('${d.user}','${d.text||'Media'}','${key}')">BALAS</span>
+        <span onclick="${isP ? 'unpin()' : `pinMsg('${key}','${d.text||'Media'}')`}">${isP ? 'UNPIN' : 'PIN'}</span>
+        ${(d.user===user && age < 300000 && !d.audio) ? `<span onclick="edit('${key}','${d.text}')">EDIT</span>` : ''}
+        ${(d.user===user && age < 600000) ? `<span onclick="del('${key}')">HAPUS</span>` : ''}
+      </div>
+    `;
+    return div;
+  }
+
+  function send(img=null, aud=null) {
+    const i = document.getElementById('m-inp');
+    if(!i.value && !img && !aud) return;
+    
+    // Pastikan replyData dikirim lalu segera di-null agar tidak nyangkut
+    const currentReply = replyData;
+    db.ref("chat/"+currentRoom).push({
+      user, text: i.value, image: img, audio: aud, timestamp: Date.now(),
+      replyTo: currentReply
+    });
+    
+    i.value = ""; 
+    cancelRep(); // Paksa hapus preview dan reset variabel
+    checkInp();
+  }
+
+  function setRep(u, t, id) {
+    replyData = { user: u, text: t, id: id };
+    const p = document.getElementById('reply-preview');
+    p.style.display='flex';
+    p.innerHTML = `<span>Balas ${u}: ${t.substring(0,20)}...</span><i class="material-icons" style="font-size:16px; cursor:pointer" onclick="cancelRep()">close</i>`;
+    document.getElementById('m-inp').focus();
+  }
+  
+  function cancelRep() { replyData = null; document.getElementById('reply-preview').style.display='none'; }
+
+  function jump(id) {
+    const el = document.getElementById("msg-" + id);
+    if(el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add("highlight");
+      setTimeout(() => el.classList.remove("highlight"), 1500);
+    }
+  }
+
+  // VN & Others
+  function hVN() { if(!mediaRec || mediaRec.state==="inactive") startV(); else stopV(); }
+  async function startV() {
+    const s = await navigator.mediaDevices.getUserMedia({audio:true});
+    mediaRec = new MediaRecorder(s); audioCh = []; isB = false;
+    mediaRec.ondataavailable = e => audioCh.push(e.data);
+    mediaRec.onstop = () => {
+      s.getTracks().forEach(t => t.stop());
+      if(!isB) {
+        const r = new FileReader();
+        r.onload = () => send(null, r.result);
+        r.readAsDataURL(new Blob(audioCh, {type:'audio/webm'}));
+      }
+      document.getElementById('rec-ui').style.display='none';
+      document.getElementById('mic-icon').innerText='mic';
+    };
+    mediaRec.start();
+    document.getElementById('rec-ui').style.display='block';
+    document.getElementById('mic-icon').innerText='stop';
+  }
+  function stopV() { mediaRec.stop(); }
+  function cancelVN() { isB = true; stopV(); }
+  function pinMsg(id, t) { db.ref(`rooms/${currentRoom}/pinned`).set({ id, text: t }); }
+  function unpin() { db.ref(`rooms/${currentRoom}/pinned`).remove(); }
+  function loadPin() {
+    db.ref(`rooms/${currentRoom}/pinned`).on("value", s => {
+      const b = document.getElementById('pin-bar');
+      if(s.exists()){ pinnedID = s.val().id; b.style.display='flex'; document.getElementById('pin-txt').innerText = "📌 " + s.val().text.substring(0,30); b.dataset.key = pinnedID; }
+      else { pinnedID = null; b.style.display='none'; }
+    });
+  }
+  function filter() {
+    const q = document.getElementById('s-inp').value.toLowerCase();
+    document.querySelectorAll('.msg').forEach(m => { m.style.display = m.innerText.toLowerCase().includes(q) ? "flex" : "none"; });
+  }
+  function checkInp() {
+    const has = document.getElementById('m-inp').value.length > 0;
+    document.getElementById('btn-mic').style.display = has ? 'none' : 'flex';
+    document.getElementById('btn-send').style.display = has ? 'flex' : 'none';
+  }
+  function edit(k,t) { const nt = prompt("Edit:",t); if(nt) db.ref(`chat/${currentRoom}/${k}`).update({text:nt + " (diedit)"}); }
+  function del(k) { if(confirm("Hapus?")) db.ref(`chat/${currentRoom}/${k}`).remove(); }
+  function upImg(i) { const r = new FileReader(); r.onload = e => send(e.target.result); r.readAsDataURL(i.files[0]); }
+</script>
+</body>
+</html>
