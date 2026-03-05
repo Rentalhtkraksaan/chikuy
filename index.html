@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <title>ProConnect - Secured Forum</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
@@ -14,10 +14,19 @@
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-    body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg); height: 100vh; overflow: hidden; color: var(--text-main); }
+    
+    body { 
+      font-family: -apple-system, system-ui, sans-serif; 
+      background: var(--bg); 
+      height: 100dvh; /* Menggunakan Dynamic Viewport Height */
+      overflow: hidden; 
+      color: var(--text-main);
+      display: flex;
+      flex-direction: column;
+    }
 
     /* Setup Screen */
-    .setup-screen { padding: 40px 24px; display: flex; flex-direction: column; gap: 20px; justify-content: center; height: 100vh; max-width: 400px; margin: 0 auto; text-align: center; }
+    .setup-screen { padding: 40px 24px; display: flex; flex-direction: column; gap: 20px; justify-content: center; height: 100%; max-width: 400px; margin: 0 auto; text-align: center; }
     .setup-screen h1 { font-size: 32px; font-weight: 800; letter-spacing: -1px; margin-bottom: 10px; }
     .setup-screen input { padding: 16px; border-radius: 12px; border: 2px solid var(--border); font-size: 16px; outline: none; transition: 0.3s; }
     .setup-screen input:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1); }
@@ -25,8 +34,8 @@
     .btn-sec { background: #fff; color: var(--primary); padding: 15px; border-radius: 12px; border: 2px solid var(--primary); font-weight: 700; cursor: pointer; margin-top:10px; }
 
     /* Main Chat Layout */
-    .chat-container { display: none; flex-direction: column; height: 100vh; background: #fff; }
-    .header { padding: 12px 16px; border-bottom: 1px solid var(--border); background: #fff; z-index: 10; }
+    .chat-container { display: none; flex-direction: column; height: 100%; background: #fff; overflow: hidden; }
+    .header { padding: 12px 16px; border-bottom: 1px solid var(--border); background: #fff; flex-shrink: 0; }
     .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
     .search-wrapper { display: flex; align-items: center; background: #f1f5f9; padding: 6px 12px; border-radius: 10px; border: 1px solid var(--border); }
     .search-wrapper input { border: none; background: transparent; padding: 5px; outline: none; width: 100%; font-size: 14px; }
@@ -43,7 +52,6 @@
     .reply-content { background: rgba(0,0,0,0.05); padding: 6px; border-left: 3px solid var(--primary); border-radius: 4px; font-size: 12px; margin-bottom: 6px; }
     .you .reply-content { background: rgba(255,255,255,0.2); border-left-color: #fff; }
 
-    /* Custom Audio Player Style */
     .audio-wrapper { display: flex; align-items: center; gap: 8px; min-width: 160px; margin: 5px 0; }
     audio { height: 35px; width: 100%; max-width: 220px; border-radius: 30px; }
 
@@ -51,13 +59,28 @@
     .you .msg-actions { border-top-color: rgba(255,255,255,0.2); }
     .msg-actions span { cursor: pointer; display: flex; align-items: center; gap: 3px; }
 
-    /* Input Area */
-    .input-area { padding: 12px 16px; border-top: 1px solid var(--border); background: #fff; }
-    .emoji-row { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 5px; }
+    /* Input Area - Dioptimasi untuk Mobile */
+    .input-area { 
+      padding: 12px 16px; 
+      padding-bottom: calc(12px + env(safe-area-inset-bottom)); 
+      border-top: 1px solid var(--border); 
+      background: #fff;
+      flex-shrink: 0;
+    }
+    .emoji-row { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 5px; scrollbar-width: none; }
+    .emoji-row::-webkit-scrollbar { display: none; }
     .emoji-row span { font-size: 20px; cursor: pointer; padding: 4px; }
     
     .input-row { display: flex; gap: 10px; align-items: center; }
-    .input-row input { flex: 1; padding: 12px 16px; border-radius: 24px; border: 1px solid var(--border); outline: none; background: #f1f5f9; }
+    .input-row input { 
+      flex: 1; 
+      padding: 12px 16px; 
+      border-radius: 24px; 
+      border: 1px solid var(--border); 
+      outline: none; 
+      background: #f1f5f9; 
+      font-size: 16px; /* Mencegah auto-zoom iOS */
+    }
 
     #replyPreview { background: #f1f5f9; border-left: 4px solid var(--primary); padding: 8px; margin-bottom: 8px; border-radius: 4px; display: none; justify-content: space-between; align-items: center; font-size: 12px; }
     #recording { color: red; font-size: 12px; font-weight: bold; display: none; margin-bottom: 5px; text-align: center;}
@@ -100,7 +123,7 @@
 
   <div class="chat-box" id="chat-box"></div>
 
-  <div class="input-area">
+  <div class="input-area" id="inputArea">
     <div id="replyPreview"></div>
     <div id="recording">● Sedang Merekam...</div>
     <div class="emoji-row">
@@ -109,7 +132,7 @@
     <div class="input-row">
       <label for="fileInp"><i class="material-icons" style="color:#64748b; font-size:28px; cursor:pointer">add_circle</i></label>
       <input type="file" id="fileInp" accept="image/*" style="display:none" onchange="uploadPhoto(this)">
-      <input type="text" id="message" placeholder="Tulis pesan...">
+      <input type="text" id="message" placeholder="Tulis pesan..." autocomplete="off">
       <i class="material-icons" id="micBtn" style="color:#64748b; cursor:pointer; font-size:28px;" onclick="toggleRecord()">mic</i>
       <button onclick="handleSendClick()" style="background:none; border:none; color:var(--primary); cursor:pointer"><i class="material-icons" style="font-size:32px">send</i></button>
     </div>
@@ -117,6 +140,7 @@
 </div>
 
 <script>
+  // Konfigurasi Firebase
   const firebaseConfig = {
     apiKey: "AIzaSyDCljKE_rVvI5U_lhUvFeu4ZENHk4jTgmI",
     authDomain: "k3-cw-5107e.firebaseapp.com",
@@ -129,11 +153,31 @@
 
   firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
+  
   let user = localStorage.getItem("chatUser") || "User-" + Math.floor(Math.random() * 999);
   localStorage.setItem("chatUser", user);
 
   let currentRoom = null, allMessages = [], replyData = null;
   let mediaRecorder, audioChunks = [];
+
+  const messageInput = document.getElementById('message');
+  const chatBox = document.getElementById('chat-box');
+
+  // Logic untuk Mobile Keyboard
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', () => {
+      const height = window.visualViewport.height;
+      document.body.style.height = height + 'px';
+      if (document.activeElement.tagName === 'INPUT') {
+        scrollToBottom();
+      }
+    });
+  }
+
+  // Kirim pesan dengan Enter
+  messageInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') handleSendClick();
+  });
 
   function closeModal() {
     document.getElementById("welcomeModal").style.display = "none";
@@ -162,7 +206,6 @@
 
   function loadMessages() {
     db.ref("chat/" + currentRoom).on("value", snap => {
-      const chatBox = document.getElementById("chat-box");
       chatBox.innerHTML = "";
       allMessages = [];
       
@@ -172,7 +215,7 @@
         allMessages.push(data);
         chatBox.appendChild(renderBubble(data));
       });
-      chatBox.scrollTop = chatBox.scrollHeight;
+      scrollToBottom();
     });
   }
 
@@ -185,10 +228,7 @@
       <div class="name">${data.user}</div>
       ${data.replyTo ? `<div class="reply-content"><b>${data.replyTo.user}:</b> ${data.replyTo.text}</div>` : ''}
       ${data.image ? `<img src="${data.image}" style="width:100%; border-radius:12px; margin-bottom:5px;">` : ''}
-      ${data.audio ? `
-        <div class="audio-wrapper">
-          <audio id="audio-${data.key}" controls src="${data.audio}"></audio>
-        </div>` : ''}
+      ${data.audio ? `<div class="audio-wrapper"><audio controls src="${data.audio}"></audio></div>` : ''}
       <div>${data.text || ''}</div>
       <div class="time">${new Date(data.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div>
       <div class="msg-actions">
@@ -200,25 +240,33 @@
     return div;
   }
 
+  function scrollToBottom() {
+    setTimeout(() => {
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }, 100);
+  }
+
   async function toggleRecord() {
     const mic = document.getElementById("micBtn");
     const recDiv = document.getElementById("recording");
 
     if (!mediaRecorder || mediaRecorder.state === "inactive") {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorder = new MediaRecorder(stream);
-      audioChunks = [];
-      mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-      mediaRecorder.onstop = () => {
-        const blob = new Blob(audioChunks, { type: 'audio/webm' });
-        const reader = new FileReader();
-        reader.onload = () => sendMsg(null, reader.result);
-        reader.readAsDataURL(blob);
-        stream.getTracks().forEach(t => t.stop());
-      };
-      mediaRecorder.start();
-      mic.style.color = "red";
-      recDiv.style.display = "block";
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks = [];
+        mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(audioChunks, { type: 'audio/webm' });
+          const reader = new FileReader();
+          reader.onload = () => sendMsg(null, reader.result);
+          reader.readAsDataURL(blob);
+          stream.getTracks().forEach(t => t.stop());
+        };
+        mediaRecorder.start();
+        mic.style.color = "red";
+        recDiv.style.display = "block";
+      } catch (err) { alert("Akses mic ditolak"); }
     } else {
       mediaRecorder.stop();
       mic.style.color = "#64748b";
@@ -237,22 +285,24 @@
   }
 
   function sendMsg(img = null, audio = null) {
-    const text = document.getElementById("message").value.trim();
+    const text = messageInput.value.trim();
     if (!text && !img && !audio) return;
     db.ref("chat/" + currentRoom).push({
       user, text, image: img, audio: audio,
       timestamp: Date.now(), replyTo: replyData
     });
-    document.getElementById("message").value = "";
+    messageInput.value = "";
     cancelReply();
+    scrollToBottom();
   }
 
-  function addEmoji(e) { document.getElementById("message").value += e; }
+  function addEmoji(e) { messageInput.value += e; messageInput.focus(); }
   function setReply(u, t) {
     replyData = { user: u, text: t };
     const p = document.getElementById("replyPreview");
     p.style.display = "flex";
     p.innerHTML = `<span>Balas ${u}: ${t.substring(0,15)}...</span><i class="material-icons" onclick="cancelReply()">close</i>`;
+    messageInput.focus();
   }
   function cancelReply() { replyData = null; document.getElementById("replyPreview").style.display = "none"; }
   function uploadPhoto(input) {
@@ -262,6 +312,15 @@
   }
   function editMsg(k, t) { const nt = prompt("Edit:", t); if(nt) db.ref(`chat/${currentRoom}/${k}`).update({ text: nt }); }
   function deleteMsg(k) { if(confirm("Hapus?")) db.ref(`chat/${currentRoom}/${k}`).remove(); }
+  
+  function filterChat() {
+    const q = document.getElementById("searchInput").value.toLowerCase();
+    const bubbles = document.querySelectorAll('.msg');
+    bubbles.forEach(b => {
+      const txt = b.innerText.toLowerCase();
+      b.style.display = txt.includes(q) ? "block" : "none";
+    });
+  }
 </script>
 </body>
 </html>
