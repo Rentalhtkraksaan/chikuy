@@ -31,6 +31,9 @@
     .msg .name { font-size: 11px; font-weight: bold; margin-bottom: 4px; opacity: 0.9; }
     .msg .time { font-size: 10px; text-align: right; margin-top: 6px; opacity: 0.7; }
     
+    .reply-content { background: rgba(0,0,0,0.05); padding: 6px; border-left: 3px solid var(--primary); border-radius: 4px; font-size: 12px; margin-bottom: 6px; }
+    .you .reply-content { background: rgba(255,255,255,0.2); border-left-color: #fff; }
+
     /* VN Player */
     .audio-container { width: 100%; min-width: 220px; margin: 5px 0; }
     audio { width: 100%; height: 35px; border-radius: 30px; }
@@ -49,9 +52,11 @@
     .action-btn { width: 45px; height: 45px; border-radius: 50%; background: var(--primary); color: white; display: flex; align-items: center; justify-content: center; border: none; cursor: pointer; flex-shrink: 0; }
     .btn-cancel { background: #ff4d4d; margin-right: 5px; }
 
+    #replyPreview { background: #fdf2f8; border-left: 4px solid var(--primary); padding: 8px; margin-bottom: 8px; border-radius: 8px; display: none; justify-content: space-between; font-size: 12px; align-items: center; }
+
     /* Setup & Modal */
     .setup-screen { padding: 40px; display: flex; flex-direction: column; gap: 20px; justify-content: center; height: 100%; text-align: center; }
-    .btn-main { background: var(--primary); color: white; padding: 16px; border-radius: 12px; border: none; font-weight: bold; }
+    .btn-main { background: var(--primary); color: white; padding: 16px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer;}
     .modal-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.4); display:flex; align-items:center; justify-content:center; z-index:100; }
     .modal-card { background:white; padding:24px; border-radius:16px; width:80%; text-align:center; }
   </style>
@@ -60,7 +65,7 @@
 
 <div id="welcomeModal" class="modal-overlay">
   <div class="modal-card">
-    <h2 style="color:var(--primary)">Pinky Chat 🌸</h2>
+    <h2 style="color:var(--primary)">Halo Pinky! 🌸</h2>
     <p style="margin: 15px 0; color:#64748b">Klik mulai untuk masuk ke room.</p>
     <button class="btn-main" style="width:100%" onclick="document.getElementById('welcomeModal').style.display='none'">Mulai</button>
   </div>
@@ -75,7 +80,10 @@
 <div class="chat-container" id="chatContainer">
   <div class="header">
     <div class="header-top">
-      <b id="roomTitle" style="color:var(--primary)">-</b>
+      <div>
+        <b id="roomTitle" style="color:var(--primary)">-</b>
+        <div style="font-size:11px; color:#db2777"><i class="material-icons" style="font-size:12px; vertical-align: middle;">groups</i> <span id="activeUsers">0</span> User Aktif</div>
+      </div>
       <i class="material-icons" style="color:var(--primary); cursor:pointer" onclick="location.reload()">logout</i>
     </div>
   </div>
@@ -83,17 +91,18 @@
   <div class="chat-box" id="chat-box"></div>
 
   <div class="input-area">
+    <div id="replyPreview"></div>
     <div id="recording-ui">
-      <span style="color:#ff4d4d; font-size:12px">● Merekam...</span>
+      <span style="color:#ff4d4d; font-size:12px; font-weight:bold">● Sedang Merekam...</span>
       <button class="action-btn btn-cancel" onclick="cancelRecord()"><i class="material-icons">close</i></button>
     </div>
     <div class="input-row">
       <div class="input-wrapper">
         <label for="fileInp"><i class="material-icons" style="color:var(--primary); cursor:pointer">add_circle</i></label>
         <input type="file" id="fileInp" accept="image/*" style="display:none" onchange="uploadPhoto(this)">
-        <input type="text" id="message" placeholder="Tulis pesan..." oninput="toggleButtons()">
+        <input type="text" id="message" placeholder="Tulis pesan manis..." oninput="toggleButtons()">
       </div>
-      <button id="btn-mic" class="action-btn" onclick="startRecord()"><i class="material-icons">mic</i></button>
+      <button id="btn-mic" class="action-btn" onclick="handleMicClick()"><i class="material-icons" id="micIcon">mic</i></button>
       <button id="btn-send" class="action-btn" style="display:none" onclick="sendMsg()"><i class="material-icons">send</i></button>
     </div>
   </div>
@@ -115,7 +124,7 @@
   const user = localStorage.getItem("chatUser") || "User-" + Math.floor(Math.random() * 999);
   localStorage.setItem("chatUser", user);
 
-  let currentRoom = null, mediaRecorder, audioChunks = [], isCancelled = false;
+  let currentRoom = null, mediaRecorder, audioChunks = [], isCancelled = false, replyData = null;
 
   function toggleButtons() {
     const hasText = document.getElementById('message').value.trim().length > 0;
@@ -130,6 +139,16 @@
     document.getElementById("setupScreen").style.display = "none";
     document.getElementById("chatContainer").style.display = "flex";
     document.getElementById("roomTitle").innerText = code;
+
+    // Hitung User Join
+    const userRef = db.ref(`rooms/${currentRoom}/users/${user}`);
+    userRef.set(true);
+    userRef.onDisconnect().remove();
+
+    db.ref(`rooms/${currentRoom}/users`).on("value", snap => {
+        document.getElementById("activeUsers").innerText = snap.numChildren();
+    });
+
     loadMessages();
   }
 
@@ -149,22 +168,33 @@
     div.className = "msg " + (data.user === user ? "you" : "other");
     const age = Date.now() - data.timestamp;
     
-    // Logika Edit (5m) & Hapus (10m)
+    // Fitur Edit (5m) & Hapus (10m)
     const canEdit = data.user === user && age < 300000 && !data.audio;
     const canDelete = data.user === user && age < 600000;
 
     div.innerHTML = `
       <div class="name">${data.user}</div>
+      ${data.replyTo ? `<div class="reply-content"><b>${data.replyTo.user}:</b> ${data.replyTo.text}</div>` : ''}
       ${data.image ? `<img src="${data.image}" style="width:100%; border-radius:10px; margin-bottom:5px;">` : ''}
       ${data.audio ? `<div class="audio-container"><audio controls src="${data.audio}"></audio></div>` : ''}
       <div style="word-break: break-word;">${data.text || ''}</div>
       <div class="time">${new Date(data.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div>
       <div class="msg-actions">
+        <span onclick="setReply('${data.user}', '${data.text || 'Media'}')">Balas</span>
         ${canEdit ? `<span onclick="editMsg('${data.key}', '${data.text}')">Edit</span>` : ''}
         ${canDelete ? `<span onclick="deleteMsg('${data.key}')">Hapus</span>` : ''}
       </div>
     `;
     return div;
+  }
+
+  // VN Logic: Otomatis kirim saat klik kedua
+  function handleMicClick() {
+    if (!mediaRecorder || mediaRecorder.state === "inactive") {
+      startRecord();
+    } else {
+      stopRecord(); 
+    }
   }
 
   async function startRecord() {
@@ -179,28 +209,42 @@
         reader.onload = () => sendMsg(null, reader.result);
         reader.readAsDataURL(new Blob(audioChunks, { type: 'audio/webm' }));
       }
+      resetVNUI();
     };
     mediaRecorder.start();
     document.getElementById("recording-ui").style.display = "flex";
+    document.getElementById("micIcon").innerText = "stop";
   }
 
-  function cancelRecord() { isCancelled = true; mediaRecorder.stop(); document.getElementById("recording-ui").style.display = "none"; }
-  
+  function stopRecord() { if (mediaRecorder) mediaRecorder.stop(); }
+  function cancelRecord() { isCancelled = true; stopRecord(); }
+  function resetVNUI() {
+    document.getElementById("recording-ui").style.display = "none";
+    document.getElementById("micIcon").innerText = "mic";
+  }
+
   function sendMsg(img = null, audio = null) {
     const inp = document.getElementById('message');
     if (!inp.value && !img && !audio) return;
     db.ref("chat/" + currentRoom).push({
-      user, text: inp.value, image: img, audio: audio, timestamp: Date.now()
+      user, text: inp.value, image: img, audio: audio, timestamp: Date.now(), replyTo: replyData
     });
-    inp.value = ""; toggleButtons();
-    if(mediaRecorder && mediaRecorder.state === "recording") { mediaRecorder.stop(); document.getElementById("recording-ui").style.display = "none"; }
+    inp.value = ""; toggleButtons(); cancelReply();
   }
+
+  function setReply(u, t) {
+    replyData = { user: u, text: t };
+    const p = document.getElementById("replyPreview");
+    p.style.display = "flex";
+    p.innerHTML = `<span>Balas ${u}: ${t.substring(0,20)}...</span><i class="material-icons" style="font-size:18px; cursor:pointer" onclick="cancelReply()">close</i>`;
+    document.getElementById('message').focus();
+  }
+  function cancelReply() { replyData = null; document.getElementById("replyPreview").style.display = "none"; }
 
   function editMsg(k, t) { 
     const nt = prompt("Edit pesan:", t); 
     if(nt) db.ref(`chat/${currentRoom}/${k}`).update({ text: nt + " (diedit)" }); 
   }
-
   function deleteMsg(k) { if(confirm("Hapus?")) db.ref(`chat/${currentRoom}/${k}`).remove(); }
   function uploadPhoto(input) {
     const reader = new FileReader();
