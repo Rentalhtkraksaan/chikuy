@@ -8,7 +8,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <style>
-    :root { --primary: #f472b6; --bg: #fdf2f8; --border: #fbcfe8; --text: #4a044e; }
+    :root { --primary: #f472b6; --bg: #fdf2f8; --border: #fbcfe8; --text: #4a044e; --danger: #ef4444; }
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     body { font-family: -apple-system, sans-serif; background: var(--bg); height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
 
@@ -23,13 +23,18 @@
     .chat-box { flex: 1; overflow-y: auto; padding: 15px; background: linear-gradient(to bottom, #fdf2f8, #fce7f3); display: flex; flex-direction: column; gap: 10px; scroll-behavior: smooth; }
 
     /* Bubble */
-    .msg { max-width: 80%; padding: 10px 14px; border-radius: 18px; position: relative; font-size: 14px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .msg { max-width: 85%; padding: 10px 14px; border-radius: 18px; position: relative; font-size: 14px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); transition: all 0.2s; }
     .msg.you { background: var(--primary); color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
     .msg.other { background: white; color: #333; align-self: flex-start; border-bottom-left-radius: 2px; border: 1px solid var(--border); }
     
     .msg .name { font-size: 10px; font-weight: bold; margin-bottom: 3px; opacity: 0.8; }
     .msg .time { font-size: 9px; text-align: right; margin-top: 5px; opacity: 0.6; }
-    
+
+    /* Audio Styling - Fix Gepeng */
+    .vn-container { margin: 8px 0; min-width: 200px; }
+    audio { height: 35px; width: 100%; border-radius: 30px; }
+    .msg.you audio { filter: invert(1) hue-rotate(180deg) brightness(1.5); }
+
     /* Jump Highlight */
     .msg.highlight { animation: flash 1.5s ease; }
     @keyframes flash { 0% { background: #fbcfe8; } 100% { } }
@@ -38,19 +43,32 @@
     .reply-box { background: rgba(0,0,0,0.07); padding: 5px 8px; border-left: 3px solid var(--primary); border-radius: 4px; font-size: 11px; margin-bottom: 5px; cursor: pointer; }
     .you .reply-box { background: rgba(255,255,255,0.2); border-left-color: white; color: white; }
 
-    /* Menu di dalam bubble - Klik Nama untuk Munculin */
     .msg-menu { display: none; font-size: 10px; margin-top: 8px; gap: 12px; border-top: 1px solid rgba(0,0,0,0.1); padding-top: 6px; font-weight: bold; cursor: pointer; }
     .msg.active .msg-menu { display: flex; }
 
-    /* Input */
+    /* Input & VN UI */
     .input-area { padding: 12px; border-top: 1px solid var(--border); background: #fff; padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+    
+    #rec-ui { 
+        display: none; align-items: center; justify-content: space-between; 
+        background: #fee2e2; padding: 10px 15px; border-radius: 15px; 
+        margin-bottom: 10px; border: 1px solid #fecaca; animation: slideUp 0.3s ease;
+    }
+    @keyframes slideUp { from { transform: translateY(10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    
+    .dot-rec { width: 8px; height: 8px; background: var(--danger); border-radius: 50%; animation: pulse 1s infinite; }
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+
+    .btn-batal { color: var(--danger); font-size: 12px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+
     #reply-preview { background: #fdf2f8; border-left: 4px solid var(--primary); padding: 8px; margin-bottom: 8px; border-radius: 8px; display: none; justify-content: space-between; font-size: 12px; align-items: center; }
 
     .input-row { display: flex; gap: 8px; align-items: center; }
     .input-field { flex: 1; background: #fdf2f8; border-radius: 25px; padding: 2px 15px; border: 1px solid var(--border); display: flex; align-items: center; }
     .input-field input { flex: 1; padding: 10px 5px; border: none; outline: none; background: transparent; font-size: 15px; }
 
-    .btn-round { width: 42px; height: 42px; border-radius: 50%; background: var(--primary); color: white; display: flex; align-items: center; justify-content: center; border: none; cursor: pointer; }
+    .btn-round { width: 42px; height: 42px; border-radius: 50%; background: var(--primary); color: white; display: flex; align-items: center; justify-content: center; border: none; cursor: pointer; transition: 0.3s; }
+    .btn-round.recording { background: var(--danger); scale: 1.1; }
     
     /* Setup */
     .setup-screen { padding: 40px; display: flex; flex-direction: column; gap: 15px; justify-content: center; height: 100%; text-align: center; }
@@ -92,7 +110,17 @@
 
   <div class="input-area">
     <div id="reply-preview"></div>
-    <div id="rec-ui" style="display:none; color:red; font-size:12px; font-weight:bold; margin-bottom:5px;">● Merekam... <span onclick="cancelVN()" style="color:#666; margin-left:10px;">[BATAL]</span></div>
+    
+    <div id="rec-ui">
+        <div style="display:flex; align-items:center; gap:8px; color:var(--danger)">
+            <div class="dot-rec"></div>
+            <span style="font-weight:bold; font-size:13px">Merekam VN...</span>
+        </div>
+        <div class="btn-batal" onclick="cancelVN()">
+            <i class="material-icons" style="font-size:18px">delete_outline</i> BATAL
+        </div>
+    </div>
+
     <div class="input-row">
       <div class="input-field">
         <label for="f-inp"><i class="material-icons" style="color:var(--primary); cursor:pointer">add_circle</i></label>
@@ -154,9 +182,8 @@
     div.className = "msg " + (d.user === user ? "you" : "other");
     div.id = "msg-" + key;
     
-    // Klik Bubble untuk menu, tapi klik box reply untuk jump
     div.onclick = (e) => {
-        if(!e.target.closest('.reply-box')) div.classList.toggle('active');
+        if(!e.target.closest('.reply-box') && !e.target.closest('audio')) div.classList.toggle('active');
     };
 
     const age = Date.now() - d.timestamp;
@@ -166,7 +193,7 @@
       <div class="name">${d.user}</div>
       ${d.replyTo ? `<div class="reply-box" onclick="jump('${d.replyTo.id}')"><b>${d.replyTo.user}</b>: ${d.replyTo.text}</div>` : ''}
       ${d.image ? `<img src="${d.image}" style="width:100%; border-radius:10px; margin-bottom:5px;">` : ''}
-      ${d.audio ? `<div style="width:100%; margin-top:5px;"><audio controls src="${d.audio}" style="width:100%; height:30px;"></audio></div>` : ''}
+      ${d.audio ? `<div class="vn-container"><audio controls src="${d.audio}"></audio></div>` : ''}
       <div style="word-break:break-word">${d.text || ''}</div>
       <div class="time">${new Date(d.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})} ${isP ? '📌' : ''}</div>
       <div class="msg-menu">
@@ -182,16 +209,13 @@
   function send(img=null, aud=null) {
     const i = document.getElementById('m-inp');
     if(!i.value && !img && !aud) return;
-    
-    // Pastikan replyData dikirim lalu segera di-null agar tidak nyangkut
     const currentReply = replyData;
     db.ref("chat/"+currentRoom).push({
       user, text: i.value, image: img, audio: aud, timestamp: Date.now(),
       replyTo: currentReply
     });
-    
     i.value = ""; 
-    cancelRep(); // Paksa hapus preview dan reset variabel
+    cancelRep();
     checkInp();
   }
 
@@ -214,28 +238,34 @@
     }
   }
 
-  // VN & Others
   function hVN() { if(!mediaRec || mediaRec.state==="inactive") startV(); else stopV(); }
+  
   async function startV() {
-    const s = await navigator.mediaDevices.getUserMedia({audio:true});
-    mediaRec = new MediaRecorder(s); audioCh = []; isB = false;
-    mediaRec.ondataavailable = e => audioCh.push(e.data);
-    mediaRec.onstop = () => {
-      s.getTracks().forEach(t => t.stop());
-      if(!isB) {
-        const r = new FileReader();
-        r.onload = () => send(null, r.result);
-        r.readAsDataURL(new Blob(audioCh, {type:'audio/webm'}));
-      }
-      document.getElementById('rec-ui').style.display='none';
-      document.getElementById('mic-icon').innerText='mic';
-    };
-    mediaRec.start();
-    document.getElementById('rec-ui').style.display='block';
-    document.getElementById('mic-icon').innerText='stop';
+    try {
+        const s = await navigator.mediaDevices.getUserMedia({audio:true});
+        mediaRec = new MediaRecorder(s); audioCh = []; isB = false;
+        mediaRec.ondataavailable = e => audioCh.push(e.data);
+        mediaRec.onstop = () => {
+          s.getTracks().forEach(t => t.stop());
+          if(!isB && audioCh.length > 0) {
+            const r = new FileReader();
+            r.onload = () => send(null, r.result);
+            r.readAsDataURL(new Blob(audioCh, {type:'audio/webm'}));
+          }
+          document.getElementById('rec-ui').style.display='none';
+          document.getElementById('mic-icon').innerText='mic';
+          document.getElementById('btn-mic').classList.remove('recording');
+        };
+        mediaRec.start();
+        document.getElementById('rec-ui').style.display='flex';
+        document.getElementById('mic-icon').innerText='stop';
+        document.getElementById('btn-mic').classList.add('recording');
+    } catch(e) { alert("Izinkan akses mikrofon untuk mengirim VN."); }
   }
-  function stopV() { mediaRec.stop(); }
+  
+  function stopV() { if(mediaRec) mediaRec.stop(); }
   function cancelVN() { isB = true; stopV(); }
+
   function pinMsg(id, t) { db.ref(`rooms/${currentRoom}/pinned`).set({ id, text: t }); }
   function unpin() { db.ref(`rooms/${currentRoom}/pinned`).remove(); }
   function loadPin() {
@@ -247,16 +277,16 @@
   }
   function filter() {
     const q = document.getElementById('s-inp').value.toLowerCase();
-    document.querySelectorAll('.msg').forEach(m => { m.style.display = m.innerText.toLowerCase().includes(q) ? "flex" : "none"; });
+    document.querySelectorAll('.msg').forEach(m => { m.style.display = m.innerText.toLowerCase().includes(q) ? "block" : "none"; });
   }
   function checkInp() {
-    const has = document.getElementById('m-inp').value.length > 0;
+    const has = document.getElementById('m-inp').value.trim().length > 0;
     document.getElementById('btn-mic').style.display = has ? 'none' : 'flex';
     document.getElementById('btn-send').style.display = has ? 'flex' : 'none';
   }
   function edit(k,t) { const nt = prompt("Edit:",t); if(nt) db.ref(`chat/${currentRoom}/${k}`).update({text:nt + " (diedit)"}); }
   function del(k) { if(confirm("Hapus?")) db.ref(`chat/${currentRoom}/${k}`).remove(); }
-  function upImg(i) { const r = new FileReader(); r.onload = e => send(e.target.result); r.readAsDataURL(i.files[0]); }
+  function upImg(i) { if(i.files[0]) { const r = new FileReader(); r.onload = e => send(e.target.result); r.readAsDataURL(i.files[0]); } }
 </script>
 </body>
 </html>
