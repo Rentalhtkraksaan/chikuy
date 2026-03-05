@@ -44,24 +44,30 @@
     .chat-box { flex: 1; overflow-y: auto; padding: 15px; background: #f8fafc; display: flex; flex-direction: column; gap: 12px; }
 
     /* Bubble Msg */
-    .msg { max-width: 85%; padding: 10px 14px; border-radius: 18px; position: relative; font-size: 15px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); line-height: 1.4; }
+    .msg { max-width: 85%; padding: 10px 14px; border-radius: 18px; position: relative; font-size: 15px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); line-height: 1.4; min-width: 80px; }
     .msg.you { background: var(--primary); color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
     .msg.other { background: white; color: #333; align-self: flex-start; border-bottom-left-radius: 2px; border: 1px solid var(--border); }
     .msg .name { font-size: 11px; font-weight: bold; margin-bottom: 4px; opacity: 0.8; }
     .msg .time { font-size: 10px; text-align: right; margin-top: 4px; opacity: 0.7; }
-    .reply-content { background: rgba(0,0,0,0.05); padding: 6px; border-left: 3px solid var(--primary); border-radius: 4px; font-size: 12px; margin-bottom: 6px; }
-    .you .reply-content { background: rgba(255,255,255,0.2); border-left-color: #fff; }
     
-    /* Media */
-    .msg img { width: 100%; border-radius: 10px; margin-top: 5px; }
-    audio { height: 35px; width: 100%; max-width: 200px; margin-top: 5px; }
+    /* Perbaikan Audio di Mobile */
+    .audio-container {
+      width: 100%;
+      min-width: 200px; /* Memberi ruang agar kontrol audio tidak gepeng */
+      margin: 5px 0;
+    }
+    audio { 
+      width: 100%; 
+      height: 35px; 
+      display: block;
+    }
 
-    /* Action Buttons */
+    .msg img { width: 100%; border-radius: 10px; margin-top: 5px; }
     .msg-actions { display: flex; gap: 12px; margin-top: 8px; padding-top: 6px; border-top: 1px solid rgba(0,0,0,0.05); font-size: 11px; }
     .you .msg-actions { border-top-color: rgba(255,255,255,0.2); }
     .msg-actions span { cursor: pointer; }
 
-    /* Input Area Optimized */
+    /* Input Area */
     .input-area { 
       padding: 10px 12px; 
       padding-bottom: calc(10px + env(safe-area-inset-bottom)); 
@@ -81,35 +87,16 @@
       align-items: center;
       min-height: 45px;
     }
-    .input-wrapper input { 
-      flex: 1; 
-      border: none; 
-      background: transparent; 
-      padding: 8px; 
-      outline: none; 
-      font-size: 16px; 
-    }
+    .input-wrapper input { flex: 1; border: none; background: transparent; padding: 8px; outline: none; font-size: 16px; }
 
-    /* Floating Action Button Style for Send/Mic */
     .action-btn { 
-      width: 45px; 
-      height: 45px; 
-      border-radius: 50%; 
-      background: var(--primary); 
-      color: white; 
-      display: flex; 
-      align-items: center; 
-      justify-content: center; 
-      border: none; 
-      cursor: pointer;
-      flex-shrink: 0;
-      transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      width: 45px; height: 45px; border-radius: 50%; background: var(--primary); color: white; 
+      display: flex; align-items: center; justify-content: center; border: none; cursor: pointer; flex-shrink: 0;
     }
-    .action-btn:active { transform: scale(0.9); }
-    
-    #btn-send { display: none; } /* Hidden by default, shown when typing */
+    #btn-send { display: none; }
 
     .emoji-row { display: flex; gap: 12px; overflow-x: auto; padding: 4px 0 8px 5px; scrollbar-width: none; }
+    .emoji-row::-webkit-scrollbar { display: none; }
     .emoji-row span { font-size: 20px; cursor: pointer; }
     #replyPreview { background: #f1f5f9; border-left: 4px solid var(--primary); padding: 8px; margin-bottom: 8px; border-radius: 8px; display: none; justify-content: space-between; font-size: 12px; }
   </style>
@@ -159,14 +146,8 @@
         <input type="file" id="fileInp" accept="image/*" style="display:none" onchange="uploadPhoto(this)">
         <input type="text" id="message" placeholder="Tulis pesan..." autocomplete="off" oninput="toggleButtons()">
       </div>
-      
-      <button id="btn-mic" class="action-btn" onclick="toggleRecord()">
-        <i class="material-icons">mic</i>
-      </button>
-      
-      <button id="btn-send" class="action-btn" onclick="handleSendClick()">
-        <i class="material-icons">send</i>
-      </button>
+      <button id="btn-mic" class="action-btn" onclick="toggleRecord()"><i class="material-icons">mic</i></button>
+      <button id="btn-send" class="action-btn" onclick="handleSendClick()"><i class="material-icons">send</i></button>
     </div>
   </div>
 </div>
@@ -184,38 +165,24 @@
 
   firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
-  
   let user = localStorage.getItem("chatUser") || "User-" + Math.floor(Math.random() * 999);
   localStorage.setItem("chatUser", user);
 
-  let currentRoom = null, replyData = null;
-  let mediaRecorder, audioChunks = [];
+  let currentRoom = null, replyData = null, mediaRecorder, audioChunks = [];
   const msgInput = document.getElementById('message');
   const chatBox = document.getElementById('chat-box');
 
-  // Logic Switch Button Mic ke Send
   function toggleButtons() {
     const btnMic = document.getElementById('btn-mic');
     const btnSend = document.getElementById('btn-send');
     if (msgInput.value.trim().length > 0) {
-      btnMic.style.display = 'none';
-      btnSend.style.display = 'flex';
+      btnMic.style.display = 'none'; btnSend.style.display = 'flex';
     } else {
-      btnMic.style.display = 'flex';
-      btnSend.style.display = 'none';
+      btnMic.style.display = 'flex'; btnSend.style.display = 'none';
     }
   }
 
-  // Keyboard Mobile Fix
-  if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', () => {
-      document.body.style.height = window.visualViewport.height + 'px';
-      scrollToBottom();
-    });
-  }
-
   function closeModal() { document.getElementById("welcomeModal").style.display = "none"; }
-
   function createForum() {
     const code = "ROOM-" + Math.random().toString(36).substring(2, 7).toUpperCase();
     document.getElementById("kodeInput").value = code;
@@ -239,39 +206,29 @@
     db.ref("chat/" + currentRoom).on("value", snap => {
       chatBox.innerHTML = "";
       snap.forEach(child => {
-        const data = child.val();
-        data.key = child.key;
-        chatBox.appendChild(renderBubble(data));
+        chatBox.appendChild(renderBubble({...child.val(), key: child.key}));
       });
-      scrollToBottom();
+      chatBox.scrollTop = chatBox.scrollHeight;
     });
   }
 
   function renderBubble(data) {
     const div = document.createElement("div");
     div.className = "msg " + (data.user === user ? "you" : "other");
-    const age = Date.now() - data.timestamp;
     div.innerHTML = `
       <div class="name">${data.user}</div>
       ${data.replyTo ? `<div class="reply-content"><b>${data.replyTo.user}:</b> ${data.replyTo.text}</div>` : ''}
       ${data.image ? `<img src="${data.image}">` : ''}
-      ${data.audio ? `<audio controls src="${data.audio}"></audio>` : ''}
+      ${data.audio ? `<div class="audio-container"><audio controls src="${data.audio}"></audio></div>` : ''}
       <div style="word-break: break-word;">${data.text || ''}</div>
       <div class="time">${new Date(data.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div>
       <div class="msg-actions">
         <span onclick="setReply('${data.user}', '${data.text || 'Media'}')">Balas</span>
-        ${data.user === user && age < 300000 ? `<span onclick="editMsg('${data.key}', '${data.text}')">Edit</span>` : ''}
-        ${data.user === user && age < 600000 ? `<span onclick="deleteMsg('${data.key}')">Hapus</span>` : ''}
       </div>
     `;
     return div;
   }
 
-  function scrollToBottom() {
-    setTimeout(() => { chatBox.scrollTop = chatBox.scrollHeight; }, 100);
-  }
-
-  // Voice Note Logic
   async function toggleRecord() {
     const btnMic = document.getElementById("btn-mic");
     const recDiv = document.getElementById("recording");
@@ -309,10 +266,9 @@
     msgInput.value = "";
     toggleButtons();
     cancelReply();
-    scrollToBottom();
   }
 
-  function addEmoji(e) { msgInput.value += e; toggleButtons(); msgInput.focus(); }
+  function addEmoji(e) { msgInput.value += e; toggleButtons(); }
   function setReply(u, t) {
     replyData = { user: u, text: t };
     const p = document.getElementById("replyPreview");
@@ -325,14 +281,6 @@
     const reader = new FileReader();
     reader.onload = e => sendMsg(e.target.result);
     reader.readAsDataURL(input.files[0]);
-  }
-  function editMsg(k, t) { const nt = prompt("Edit:", t); if(nt) db.ref(`chat/${currentRoom}/${k}`).update({ text: nt }); }
-  function deleteMsg(k) { if(confirm("Hapus?")) db.ref(`chat/${currentRoom}/${k}`).remove(); }
-  function filterChat() {
-    const q = document.getElementById("searchInput").value.toLowerCase();
-    document.querySelectorAll('.msg').forEach(b => {
-      b.style.display = b.innerText.toLowerCase().includes(q) ? "block" : "none";
-    });
   }
 </script>
 </body>
